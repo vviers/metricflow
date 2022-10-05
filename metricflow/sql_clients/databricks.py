@@ -1,16 +1,20 @@
 from __future__ import annotations
-from typing import Optional, List, ClassVar, Dict
-import pandas as pd
+
 import logging
 import time
+from typing import Optional, List, ClassVar, Dict
+
+import pandas as pd
 import sqlalchemy
+
 from databricks import sql
-from metricflow.sql_clients.common_client import SqlDialect
-from metricflow.sql_clients.base_sql_client_implementation import BaseSqlClientImplementation
-from metricflow.protocols.sql_client import SqlEngineAttributes, SupportedSqlEngine
-from metricflow.sql.sql_bind_parameters import SqlBindParameters
 from metricflow.dataflow.sql_table import SqlTable
+from metricflow.protocols.sql_client import SqlEngineAttributes, SupportedSqlEngine
+from metricflow.protocols.sql_request import SqlRequestTagSet
 from metricflow.sql.render.sql_plan_renderer import DefaultSqlQueryPlanRenderer, SqlQueryPlanRenderer
+from metricflow.sql.sql_bind_parameters import SqlBindParameters
+from metricflow.sql_clients.base_sql_client_implementation import BaseSqlClientImplementation
+from metricflow.sql_clients.common_client import SqlDialect
 
 logger = logging.getLogger(__name__)
 
@@ -184,3 +188,6 @@ class DatabricksSqlClient(BaseSqlClientImplementation):
     def render_execution_param_key(self, execution_param_key: str) -> str:
         """Wrap execution parameter key with syntax accepted by engine."""
         return f"%({execution_param_key})s"
+
+    def cancel_request(self, pattern_tag_set: SqlRequestTagSet) -> int:  # noqa: D
+        raise NotImplementedError

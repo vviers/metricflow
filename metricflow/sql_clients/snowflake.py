@@ -11,6 +11,7 @@ import sqlalchemy
 from sqlalchemy.exc import ProgrammingError
 
 from metricflow.protocols.sql_client import SupportedSqlEngine, SqlEngineAttributes
+from metricflow.protocols.sql_request import SqlRequestTagSet
 from metricflow.sql.render.sql_plan_renderer import DefaultSqlQueryPlanRenderer
 from metricflow.sql.render.sql_plan_renderer import SqlQueryPlanRenderer
 from metricflow.sql.sql_bind_parameters import SqlBindParameters
@@ -240,3 +241,6 @@ class SnowflakeSqlClient(SqlAlchemySqlClient):
                 for session_id in self._known_session_ids:
                     logger.info(f"Cancelling queries associated with session id: {session_id}")
                     conn.execute(f"SELECT SYSTEM$cancel_all_queries({session_id})")
+
+    def cancel_request(self, pattern_tag_set: SqlRequestTagSet) -> int:  # noqa: D
+        raise NotImplementedError

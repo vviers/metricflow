@@ -6,6 +6,7 @@ from typing import ClassVar, Optional, List
 import sqlalchemy
 
 from metricflow.protocols.sql_client import SupportedSqlEngine, SqlEngineAttributes
+from metricflow.protocols.sql_request import SqlRequestTagSet
 from metricflow.sql.render.big_query import BigQuerySqlQueryPlanRenderer
 from metricflow.sql.render.sql_plan_renderer import SqlQueryPlanRenderer
 from metricflow.sql.sql_bind_parameters import SqlBindParameters
@@ -112,4 +113,7 @@ class BigQuerySqlClient(SqlAlchemySqlClient):
             return [x.replace(schema_name + ".", "") for x in schema_dot_tables]
 
     def cancel_submitted_queries(self) -> None:  # noqa: D
+        raise NotImplementedError
+
+    def cancel_request(self, pattern_tag_set: SqlRequestTagSet) -> int:  # noqa: D
         raise NotImplementedError

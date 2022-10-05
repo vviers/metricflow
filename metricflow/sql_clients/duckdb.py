@@ -8,6 +8,7 @@ from sqlalchemy.pool import StaticPool
 
 from metricflow.dataflow.sql_table import SqlTable
 from metricflow.protocols.sql_client import SupportedSqlEngine, SqlEngineAttributes
+from metricflow.protocols.sql_request import SqlRequestTagSet
 from metricflow.sql.render.duckdb_renderer import DuckDbSqlQueryPlanRenderer
 from metricflow.sql.render.sql_plan_renderer import SqlQueryPlanRenderer
 from metricflow.sql.sql_bind_parameters import SqlBindParameters
@@ -99,3 +100,6 @@ class DuckDbSqlClient(SqlAlchemySqlClient):
                 df=df,
                 chunk_size=chunk_size,
             )
+
+    def cancel_request(self, pattern_tag_set: SqlRequestTagSet) -> int:  # noqa: D
+        raise NotImplementedError

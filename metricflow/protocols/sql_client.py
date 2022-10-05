@@ -2,12 +2,14 @@ from __future__ import annotations
 
 from abc import abstractmethod
 from enum import Enum
-from typing import ClassVar, Dict, Optional, Protocol
+from typing import ClassVar, Dict, Optional, Protocol, Sequence
+
+from pandas import DataFrame
 
 from metricflow.dataflow.sql_table import SqlTable
+from metricflow.protocols.sql_request import SqlRequestId, SqlRequestResult, SqlRequestTagSet
 from metricflow.sql.render.sql_plan_renderer import SqlQueryPlanRenderer
 from metricflow.sql.sql_bind_parameters import SqlBindParameters
-from pandas import DataFrame
 
 
 class SupportedSqlEngine(Enum):
@@ -147,6 +149,46 @@ class SqlClient(Protocol):
     @abstractmethod
     def render_execution_param_key(self, execution_param_key: str) -> str:
         """Wrap execution parameter key with syntax accepted by engine."""
+        raise NotImplementedError
+
+    def async_query(
+        self,
+        statement: str,
+        bind_parameters: SqlBindParameters = SqlBindParameters(),
+        tags: SqlRequestTagSet = SqlRequestTagSet(),
+    ) -> SqlRequestId:
+        """Execute a query asynchronously."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def async_request_result(self, request_id: SqlRequestId) -> SqlRequestResult:
+        """Wait until a async query has finished, and then return the result"""
+        raise NotImplementedError
+
+    @abstractmethod
+    def async_execute(
+        self,
+        statement: str,
+        bind_parameters: SqlBindParameters = SqlBindParameters(),
+        tags: SqlRequestTagSet = SqlRequestTagSet(),
+    ) -> SqlRequestId:
+        """Execute a statement that does not return values asynchronously."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def cancel_request(self, pattern_tag_set: SqlRequestTagSet) -> int:
+        """Make a best-effort at canceling requests that have a superset of the given tags.
+
+        Returns the number of cancellation command sent.
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def active_requests(self) -> Sequence[SqlRequestId]:
+        """Return requests that are still in progress.
+
+        If the results for a request have not yet been fetched with async_request_result(), it's considered in progress.
+        """
         raise NotImplementedError
 
 
