@@ -4,17 +4,20 @@ import logging
 import time
 from typing import Optional, List, ClassVar, Dict
 
+import databricks_api
 import pandas as pd
 import sqlalchemy
 
 from databricks import sql
 from metricflow.dataflow.sql_table import SqlTable
+from metricflow.object_utils import pformat_big_objects
 from metricflow.protocols.sql_client import SqlEngineAttributes, SupportedSqlEngine
 from metricflow.protocols.sql_request import SqlRequestTagSet
 from metricflow.sql.render.sql_plan_renderer import DefaultSqlQueryPlanRenderer, SqlQueryPlanRenderer
 from metricflow.sql.sql_bind_parameters import SqlBindParameters
 from metricflow.sql_clients.base_sql_client_implementation import BaseSqlClientImplementation
 from metricflow.sql_clients.common_client import SqlDialect
+from databricks_api import DatabricksAPI
 
 logger = logging.getLogger(__name__)
 
@@ -58,6 +61,15 @@ class DatabricksSqlClient(BaseSqlClientImplementation):
         self.host = host
         self.http_path = http_path
         self.access_token = access_token
+
+        self._databricks_api_client = databricks_api.DatabricksAPI(
+            host=host,
+            token=access_token,
+            # Pagination of jobs only supported in v2.1
+            api_version="2.1",
+        )
+
+        super().__init__()
 
     @staticmethod
     def from_connection_details(url: str, password: Optional[str]) -> DatabricksSqlClient:  # noqa: D
@@ -190,4 +202,9 @@ class DatabricksSqlClient(BaseSqlClientImplementation):
         return f"%({execution_param_key})s"
 
     def cancel_request(self, pattern_tag_set: SqlRequestTagSet) -> int:  # noqa: D
-        raise NotImplementedError
+        jobs = self._databricks_api_client.jobs.list_jobs(limit=10)
+        logger.error(f"There are {len(jobs)} jobs")
+        logger.error(f"Jobs: {jobs}")
+        for job in jobs:
+            logger.error(f"Job is:\n{job}")
+

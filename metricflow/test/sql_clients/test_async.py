@@ -67,3 +67,28 @@ def test_cancel_request(sql_client: SqlClient, mf_test_session_state: MetricFlow
     num_cancelled = sql_client.cancel_request(SqlRequestTagSet.create_from_request_id(request_id))
     sql_client.async_request_result(request_id)
     assert num_cancelled == 1
+
+
+def test_databricks(sql_client: SqlClient, mf_test_session_state: MetricFlowTestSessionState) -> None:
+    # Execute a query that will be slow, giving the test the opportunity to cancel it.
+    table_with_1000_rows = create_table_with_n_rows(sql_client, mf_test_session_state.mf_system_schema, num_rows=1000)
+    table_with_100_rows = create_table_with_n_rows(sql_client, mf_test_session_state.mf_system_schema, num_rows=100)
+
+    request_id = sql_client.async_execute(
+        textwrap.dedent(
+            f"""
+                SELECT MAX(random_value) AS max_value
+                FROM (
+                    SELECT {sql_client.sql_engine_attributes.random_function_name}() AS random_value
+                    FROM {table_with_1000_rows.sql} a
+                    CROSS JOIN {table_with_1000_rows.sql} b
+                    CROSS JOIN {table_with_1000_rows.sql} c
+                    -- CROSS JOIN {table_with_100_rows.sql} d
+                ) subq
+                """
+        )
+    )
+    time.sleep(2)
+    sql_client.cancel_request(SqlRequestTagSet())
+    time.sleep(2)
+    sql_client.cancel_request(SqlRequestTagSet())
