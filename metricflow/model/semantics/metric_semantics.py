@@ -31,6 +31,7 @@ class MetricSemantics:  # noqa: D
 
         self._linkable_spec_resolver = ValidLinkableSpecResolver(
             user_configured_model=self._user_configured_model,
+            data_source_semantics=data_source_semantics,
             max_identifier_links=MAX_JOIN_HOPS,
         )
 

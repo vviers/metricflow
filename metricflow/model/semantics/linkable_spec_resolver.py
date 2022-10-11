@@ -6,12 +6,15 @@ from collections import defaultdict
 from dataclasses import dataclass
 from typing import Tuple, Sequence, Dict, List, Optional, FrozenSet
 
+from metricflow.instances import DataSourceReference
 from metricflow.model.objects.data_source import DataSource
 from metricflow.model.objects.elements.dimension import DimensionType, Dimension
 from metricflow.model.objects.elements.identifier import IdentifierType
 from metricflow.model.objects.user_configured_model import UserConfiguredModel
 from metricflow.model.semantics.linkable_element_properties import LinkableElementProperties
+from metricflow.model.semantics.valid_join import DataSourceJoinValidator
 from metricflow.object_utils import pformat_big_objects, flatten_nested_sequence
+from metricflow.protocols.semantics import DataSourceSemanticsAccessor
 from metricflow.references import MeasureReference
 from metricflow.specs import (
     DEFAULT_TIME_GRANULARITY,
@@ -378,16 +381,19 @@ class ValidLinkableSpecResolver:
     def __init__(
         self,
         user_configured_model: UserConfiguredModel,
+        data_source_semantics: DataSourceSemanticsAccessor,
         max_identifier_links: int,
     ) -> None:
         """Constructor.
 
         Args:
             user_configured_model: the model to use.
+            data_source_semantics: used to look up identifiers for a data source.
             max_identifier_links: the maximum number of joins to do when computing valid elements.
         """
         self._user_configured_model = user_configured_model
         self._data_sources = self._user_configured_model.data_sources
+        self._join_validator = DataSourceJoinValidator(data_source_semantics)
 
         assert max_identifier_links >= 0
         self._max_identifier_links = max_identifier_links
@@ -398,8 +404,7 @@ class ValidLinkableSpecResolver:
 
         for data_source in self._data_sources:
             for identifier in data_source.identifiers:
-                if identifier.type in (IdentifierType.PRIMARY, IdentifierType.UNIQUE):
-                    self._identifier_to_data_source[identifier.reference.element_name].append(data_source)
+                self._identifier_to_data_source[identifier.reference.element_name].append(data_source)
 
         self._metric_to_linkable_element_sets: Dict[str, List[LinkableElementSet]] = {}
 
@@ -484,10 +489,22 @@ class ValidLinkableSpecResolver:
             ambiguous_linkable_identifiers=(),
         )
 
-    def _get_data_sources_with_joinable_identifier(self, identifier_name: str) -> Sequence[DataSource]:
+    def _get_data_sources_with_joinable_identifier(
+        self,
+        left_data_source_reference: DataSourceReference,
+        identifier_reference: IdentifierReference,
+    ) -> Sequence[DataSource]:
         # May switch to non-cached implementation.
-        data_sources = self._identifier_to_data_source[identifier_name]
-        return data_sources
+        data_sources = self._identifier_to_data_source[identifier_reference.element_name]
+        valid_data_sources = []
+        for data_source in data_sources:
+            if self._join_validator.is_valid_data_source_join(
+                left_data_source_reference=left_data_source_reference,
+                right_data_source_reference=data_source.reference,
+                on_identifier_reference=identifier_reference,
+            ):
+                valid_data_sources.append(data_source)
+        return valid_data_sources
 
     def _get_linkable_element_set_for_measure(self, measure_reference: MeasureReference) -> LinkableElementSet:
         """Get the valid linkable elements for the given measure."""
@@ -499,7 +516,10 @@ class ValidLinkableSpecResolver:
 
         # Create 1-hop elements
         for identifier in measure_data_source.identifiers:
-            data_sources = self._get_data_sources_with_joinable_identifier(identifier.reference.element_name)
+            data_sources = self._get_data_sources_with_joinable_identifier(
+                left_data_source_reference=measure_data_source.reference,
+                identifier_reference=identifier.reference,
+            )
             for data_source in data_sources:
                 if data_source.name == measure_data_source.name:
                     continue
@@ -578,7 +598,10 @@ class ValidLinkableSpecResolver:
             if identifier_name in set(x.join_on_identifier for x in current_join_path.path_elements):
                 continue
 
-            data_sources_that_can_be_joined = self._get_data_sources_with_joinable_identifier(identifier_name)
+            data_sources_that_can_be_joined = self._get_data_sources_with_joinable_identifier(
+                left_data_source_reference=data_source.reference,
+                identifier_reference=identifier.reference,
+            )
             for data_source in data_sources_that_can_be_joined:
                 # Don't create cycles in the join path by not repeating a data source in the path.
                 if data_source.name == measure_data_source.name or any(
